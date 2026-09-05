@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>75 HARD Tracker</title>
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fff1f2',
+              500: '#f43f5e',
+              600: '#e11d48',
+              700: '#be123c',
+              900: '#881337',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & Babel via CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Custom mobile styling & smooth transitions */
+    body {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      background-color: #09090b;
+    }
+    input[type="text"] {
+      font-size: 16px; /* Prevents auto-zoom on iOS */
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .custom-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen antialiased selection:bg-rose-500 selection:text-white">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // --- HELPER ICONS ---
+    const Icons = {
+      Droplet: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />
+        </svg>
+      ),
+      Sun: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ),
+      Dumbbell: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h3m12 0h3m-6 0a3 3 0 00-6 0m6 0v12a3 3 0 01-6 0V6m-3 0a3 3 0 00-3 3v6a3 3 0 003 3m12-12a3 3 0 013 3v6a3 3 0 01-3 3" />
+        </svg>
+      ),
+      Book: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      ),
+      Apple: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      Ban: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+        </svg>
+      ),
+      Camera: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      Check: () => (
+        <svg className="w-4 h-4 text-emerald-400 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      ),
+      Settings: () => (
+        <svg className="w-5 h-5 text-zinc-400 hover:text-zinc-200 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      Sync: ({ spinning }) => (
+        <svg className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      ),
+      History: () => (
+        <svg className="w-5 h-5 text-zinc-400 hover:text-zinc-200 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    };
+
+    function getTodayKey() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function calculateDayNumber(startDateIso) {
+      if (!startDateIso) return 1;
+      const start = new Date(startDateIso);
+      start.setHours(0, 0, 0, 0);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const diffMs = now.getTime() - start.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      return Math.max(1, diffDays + 1);
+    }
+
+    const defaultDayState = {
+      water1: false,
+      water2: false,
+      workout1Complete: false,
+      workout1Desc: '',
+      workout2Complete: false,
+      workout2Desc: '',
+      readingComplete: false,
+      bookTitle: '',
+      pagesRead: '',
+      dietFollowed: false,
+      noAlcohol: false,
+      photoTaken: false,
+      photoBase64: null,
+      synced: false
+    };
+
+    function App() {
+      // --- PERSISTENT STATE ---
+      const [hasStarted, setHasStarted] = useState(() => {
+        return localStorage.getItem('75hard_started') === 'true';
+      });
+      const [startDate, setStartDate] = useState(() => {
+        return localStorage.getItem('75hard_startDate') || null;
+      });
+      const [webAppUrl, setWebAppUrl] = useState(() => {
+        return localStorage.getItem('75hard_webAppUrl') || '';
+      });
+      const [autoSync, setAutoSync] = useState(() => {
+        return localStorage.getItem('75hard_autoSync') === 'true';
+      });
+      const [archivedAttempts, setArchivedAttempts] = useState(() => {
+        const saved = localStorage.getItem('75hard_archives');
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      // Daily Logs dictionary keyed by YYYY-MM-DD
+      const [dailyLogs, setDailyLogs] = useState(() => {
+        const saved = localStorage.getItem('75hard_dailyLogs');
+        return saved ? JSON.parse(saved) : {};
+      });
+
+      // UI States
+      const [showSettings, setShowSettings] = useState(false);
+      const [showResetConfirm, setShowResetConfirm] = useState(false);
+      const [showHistory, setShowHistory] = useState(false);
+      const [isSyncing, setIsSyncing] = useState(false);
+      const [syncMessage, setSyncMessage] = useState(null);
+
+      const todayKey = getTodayKey();
+      const currentDay = calculateDayNumber(startDate);
+
+      // Current Day's Tracking State
+      const currentEntry = useMemo(() => {
+        return dailyLogs[todayKey] || { ...defaultDayState };
+      }, [dailyLogs, todayKey]);
+
+      // Save state to localStorage
+      useEffect(() => {
+        localStorage.setItem('75hard_started', hasStarted);
+        if (startDate) localStorage.setItem('75hard_startDate', startDate);
+        localStorage.setItem('75hard_webAppUrl', webAppUrl);
+        localStorage.setItem('75hard_autoSync', autoSync);
+        localStorage.setItem('75hard_archives', JSON.stringify(archivedAttempts));
+        localStorage.setItem('75hard_dailyLogs', JSON.stringify(dailyLogs));
+      }, [hasStarted, startDate, webAppUrl, autoSync, archivedAttempts, dailyLogs]);
+
+      // Calculate daily score
+      const taskWeights = useMemo(() => {
+        const waterDone = currentEntry.water1 && currentEntry.water2;
+        const w1Done = currentEntry.workout1Complete;
+        const w2Done = currentEntry.workout2Complete;
+        const readDone = currentEntry.readingComplete;
+        const dietDone = currentEntry.dietFollowed;
+        const alcDone = currentEntry.noAlcohol;
+        const photoDone = currentEntry.photoTaken;
+
+        const totalTasks = 7;
+        const completedCount = [waterDone, w1Done, w2Done, readDone, dietDone, alcDone, photoDone].filter(Boolean).length;
+        const percent = Math.round((completedCount / totalTasks) * 100);
+        const allCompleted = completedCount === totalTasks;
+
+        return {
+          waterDone,
+          w1Done,
+          w2Done,
+          readDone,
+          dietDone,
+          alcDone,
+          photoDone,
+          completedCount,
+          totalTasks,
+          percent,
+          allCompleted
+        };
+      }, [currentEntry]);
+
+      // Update current log
+      const updateLog = (fields) => {
+        setDailyLogs(prev => {
+          const oldEntry = prev[todayKey] || { ...defaultDayState };
+          const updated = { ...oldEntry, ...fields, synced: false };
+          return { ...prev, [todayKey]: updated };
+        });
+      };
+
+      // Trigger Start
+      const handleStartChallenge = () => {
+        const now = new Date();
+        const iso = now.toISOString();
+        setStartDate(iso);
+        setHasStarted(true);
+        // initialize today's entry
+        setDailyLogs(prev => ({
+          ...prev,
+          [todayKey]: prev[todayKey] || { ...defaultDayState }
+        }));
+      };
+
+      // Reset to Day 1 Flow
+      const handleResetChallenge = () => {
+        if (!startDate) return;
+        const archiveRecord = {
+          resetTimestamp: new Date().toISOString(),
+          endedAtDay: currentDay,
+          startDate: startDate,
+          totalDaysLogged: Object.keys(dailyLogs).length
+        };
+        setArchivedAttempts(prev => [archiveRecord, ...prev]);
+
+        const now = new Date().toISOString();
+        setStartDate(now);
+        setDailyLogs({
+          [todayKey]: { ...defaultDayState }
+        });
+        setShowResetConfirm(false);
+        showToast(`Streak archived. Welcome to Day 1.`);
+      };
+
+      // Progress Photo handling
+      const handlePhotoUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          updateLog({
+            photoTaken: true,
+            photoBase64: reader.result
+          });
+          showToast("Photo saved to device & marked complete!");
+        };
+        reader.readAsDataURL(file);
+      };
+
+      // Sync to Google Sheet
+      const syncToGoogleSheets = async (silent = false) => {
+        if (!webAppUrl.trim()) {
+          if (!silent) showToast("Add Google Apps Script URL in Settings first.", "error");
+          return;
+        }
+
+        setIsSyncing(true);
+        if (!silent) setSyncMessage({ type: 'info', text: 'Syncing to Google Sheets...' });
+
+        const payload = {
+          dayNumber: currentDay,
+          date: todayKey,
+          water1: currentEntry.water1,
+          water2: currentEntry.water2,
+          workout1Complete: currentEntry.workout1Complete,
+          workout1Desc: currentEntry.workout1Desc,
+          workout2Complete: currentEntry.workout2Complete,
+          workout2Desc: currentEntry.workout2Desc,
+          readingComplete: currentEntry.readingComplete,
+          bookTitle: currentEntry.bookTitle,
+          pagesRead: currentEntry.pagesRead,
+          dietFollowed: currentEntry.dietFollowed,
+          noAlcohol: currentEntry.noAlcohol,
+          photoTaken: currentEntry.photoTaken
+        };
+
+        try {
+          await fetch(webAppUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          });
+
+          // In no-cors mode, the promise resolving signifies network dispatch success
+          updateLog({ synced: true });
+          if (!silent) showToast("Synced successfully to Google Sheets!", "success");
+        } catch (err) {
+          console.error("Sync Error:", err);
+          if (!silent) showToast("Failed to sync. Verify your Apps Script URL.", "error");
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+
+      // Auto sync debounce when enabled
+      useEffect(() => {
+        if (autoSync && hasStarted && webAppUrl) {
+          const timeout = setTimeout(() => {
+            syncToGoogleSheets(true);
+          }, 3500);
+          return () => clearTimeout(timeout);
+        }
+      }, [currentEntry, autoSync]);
+
+      const showToast = (text, type = 'info') => {
+        setSyncMessage({ text, type });
+        setTimeout(() => setSyncMessage(null), 3500);
+      };
+
+      // --- ONBOARDING VIEW ---
+      if (!hasStarted) {
+        return (
+          <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-zinc-950 via-zinc-900 to-black text-white">
+            <div className="max-w-md w-full text-center space-y-8 p-6 sm:p-8 bg-zinc-900/60 border border-zinc-800 rounded-3xl backdrop-blur-xl shadow-2xl">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 mb-2 shadow-inner">
+                <span className="text-3xl font-black tracking-tighter">75</span>
+              </div>
+              
+              <div className="space-y-2">
+                <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-tight text-zinc-100">
+                  75 Hard Tracker
+                </h1>
+                <p className="text-sm sm:text-base text-zinc-400 font-medium">
+                  A zero-compromise mental toughness program. 75 consecutive days of discipline.
+                </p>
+              </div>
+
+              <div className="bg-zinc-950/80 rounded-2xl p-4 text-left border border-zinc-800/80 text-xs space-y-2.5 text-zinc-300">
+                <p className="font-semibold text-zinc-100 uppercase tracking-wider text-[10px] text-rose-400">The 5 Daily Rules:</p>
+                <div className="flex items-center space-x-2"><span>💧</span><span>1 Gallon of plain water</span></div>
+                <div className="flex items-center space-x-2"><span>🏃</span><span>Two 45m workouts (one MUST be outdoor)</span></div>
+                <div className="flex items-center space-x-2"><span>🥗</span><span>Strict diet, zero cheat meals & zero alcohol</span></div>
+                <div className="flex items-center space-x-2"><span>📖</span><span>10 pages of non-fiction reading</span></div>
+                <div className="flex items-center space-x-2"><span>📸</span><span>Daily progress photo taken</span></div>
+                <p className="pt-2 text-[11px] text-zinc-500 italic border-t border-zinc-800/60">
+                  Fail any task? Start over at Day 1. No compromises.
+                </p>
+              </div>
+
+              <button
+                onClick={handleStartChallenge}
+                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 active:scale-[0.98] transition font-bold text-base uppercase tracking-wider text-white shadow-lg shadow-rose-900/30"
+              >
+                Launch 75 Hard (Day 1)
+              </button>
+            </div>
+          </main>
+        );
+      }
+
+      // --- MAIN TRACKER DASHBOARD ---
+      return (
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between pb-12 font-sans selection:bg-rose-500 selection:text-white">
+          
+          {/* Top Bar Header */}
+          <header className="sticky top-0 z-30 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/60 px-4 py-3 sm:px-6">
+            <div className="max-w-xl mx-auto flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-rose-600 text-white font-black text-sm">
+                  75
+                </span>
+                <span className="font-extrabold uppercase tracking-tight text-sm text-zinc-200">Hard Tracker</span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowHistory(true)}
+                  className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 transition"
+                  title="View History / Archived Streaks"
+                >
+                  <Icons.History />
+                </button>
+
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 transition"
+                  title="Settings & Sheet Integration"
+                >
+                  <Icons.Settings />
+                </button>
+
+                <button
+                  onClick={() => syncToGoogleSheets(false)}
+                  disabled={isSyncing}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-xs font-semibold text-zinc-300 active:scale-95 transition"
+                >
+                  <Icons.Sync spinning={isSyncing} />
+                  <span>{currentEntry.synced ? 'Synced' : 'Sync'}</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content Area */}
+          <main className="flex-1 max-w-xl w-full mx-auto p-4 sm:p-6 space-y-6">
+            
+            {/* Dynamic Counter & Progress Banner */}
+            <section className="bg-gradient-to-b from-zinc-900 to-zinc-900/60 border border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+              <div className="flex items-end justify-between mb-4">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-rose-500 mb-0.5">
+                    {taskWeights.allCompleted ? '🔥 DAY COMPLETE' : 'IN PROGRESS'}
+                  </div>
+                  <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white flex items-baseline gap-1">
+                    Day {currentDay}
+                    <span className="text-xl sm:text-2xl font-bold text-zinc-500">/ 75</span>
+                  </h1>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Remaining</span>
+                  <div className="text-2xl sm:text-3xl font-black text-zinc-200">
+                    {Math.max(0, 75 - currentDay)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-medium text-zinc-400">
+                  <span>Daily Tasks ({taskWeights.completedCount}/{taskWeights.totalTasks})</span>
+                  <span className="font-bold text-rose-400">{taskWeights.percent}%</span>
+                </div>
+                <div className="w-full h-3 bg-zinc-950 rounded-full overflow-hidden p-0.5 border border-zinc-800">
+                  <div
+                    className="h-full bg-gradient-to-r from-rose-600 to-rose-400 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${taskWeights.percent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Day info footer */}
+              <div className="mt-4 pt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500">
+                <span>Date: <strong className="text-zinc-400">{todayKey}</strong></span>
+                <button
+                  onClick={() => setShowResetConfirm(true)}
+                  className="text-rose-500/80 hover:text-rose-400 text-xs font-semibold hover:underline"
+                >
+                  Reset to Day 1
+                </button>
+              </div>
+            </section>
+
+            {/* Checklist Section */}
+            <div className="space-y-3.5">
+              
+              {/* 1. Water Intake Card */}
+              <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${taskWeights.waterDone ? 'bg-zinc-900/90 border-emerald-500/40' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2.5 rounded-xl ${taskWeights.waterDone ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                      <Icons.Droplet />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-base text-zinc-100 leading-tight">1 Gallon of Water</h2>
+                      <p className="text-xs text-zinc-400">128 oz total (No additives or flavor packets)</p>
+                    </div>
+                  </div>
+                  {taskWeights.waterDone && <Icons.Check />}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => updateLog({ water1: !currentEntry.water1 })}
+                    className={`py-3 px-3 rounded-xl border font-semibold text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all active:scale-[0.98] ${
+                      currentEntry.water1
+                        ? 'bg-blue-600/20 border-blue-500/60 text-blue-300'
+                        : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    }`}
+                  >
+                    <span className={`w-4 h-4 rounded-md flex items-center justify-center border text-[10px] ${currentEntry.water1 ? 'bg-blue-500 border-blue-400 text-white' : 'border-zinc-700'}`}>
+                      {currentEntry.water1 ? '✓' : ''}
+                    </span>
+                    <span>64 oz Bottle #1</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => updateLog({ water2: !currentEntry.water2 })}
+                    className={`py-3 px-3 rounded-xl border font-semibold text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all active:scale-[0.98] ${
+                      currentEntry.water2
+                        ? 'bg-blue-600/20 border-blue-500/60 text-blue-300'
+                        : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    }`}
+                  >
+                    <span className={`w-4 h-4 rounded-md flex items-center justify-center border text-[10px] ${currentEntry.water2 ? 'bg-blue-500 border-blue-400 text-white' : 'border-zinc-700'}`}>
+                      {currentEntry.water2 ? '✓' : ''}
+                    </span>
+                    <span>64 oz Bottle #2</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Workout 1 (Outdoor) */}
+              <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${currentEntry.workout1Complete ? 'bg-zinc-900/90 border-emerald-500/40' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2.5 rounded-xl ${currentEntry.workout1Complete ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                      <Icons.Sun />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h2 className="font-bold text-base text-zinc-100 leading-tight">Workout 1 (Outdoor)</h2>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 uppercase">45 Min</span>
+                      </div>
+                      <p className="text-xs text-zinc-400">Must be open air, regardless of weather</p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => updateLog({ workout1Complete: !currentEntry.workout1Complete })}
+                    className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
+                      currentEntry.workout1Complete
+                        ? 'bg-emerald-500 border-emerald-400 text-white'
+                        : 'border-zinc-700 hover:border-zinc-600 bg-zinc-950'
+                    }`}
+                  >
+                    {currentEntry.workout1Complete && '✓'}
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  value={currentEntry.workout1Desc}
+                  onChange={(e) => updateLog({ workout1Desc: e.target.value })}
+                  placeholder="Activity (e.g. 45m Outdoor Ruck, 4-Mile Run)"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition"
+                />
+              </div>
+
+              {/* 3. Workout 2 (Indoor / Any) */}
+              <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${currentEntry.workout2Complete ? 'bg-zinc-900/90 border-emerald-500/40' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2.5 rounded-xl ${currentEntry.workout2Complete ? 'bg-emerald-500/10 text-emerald-400' : 'bg-orange-500/10 text-orange-400'}`}>
+                      <Icons.Dumbbell />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h2 className="font-bold text-base text-zinc-100 leading-tight">Workout 2 (Indoor / Any)</h2>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 uppercase">45 Min</span>
+                      </div>
+                      <p className="text-xs text-zinc-400">Gym, weights, yoga, or second cardio</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => updateLog({ workout2Complete: !currentEntry.workout2Complete })}
+                    className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
+                      currentEntry.workout2Complete
+                        ? 'bg-emerald-500 border-emerald-400 text-white'
+                        : 'border-zinc-700 hover:border-zinc-600 bg-zinc-950'
+                    }`}
+                  >
+                    {currentEntry.workout2Complete && '✓'}
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  value={currentEntry.workout2Desc}
+                  onChange={(e) => updateLog({ workout2Desc: e.target.value })}
+                  placeholder="Activity (e.g. Chest & Triceps, Kettlebell circuit)"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition"
+                />
+              </div>
+
+              {/* 4. Reading (10 Pages Non-Fiction) */}
+              <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${currentEntry.readingComplete ? 'bg-zinc-900/90 border-emerald-500/40' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2.5 rounded-xl ${currentEntry.readingComplete ? 'bg-emerald-500/10 text-emerald-400' : 'bg-violet-500/10 text-violet-400'}`}>
+                      <Icons.Book />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-base text-zinc-100 leading-tight">10 Pages Non-Fiction</h2>
+                      <p className="text-xs text-zinc-400">Physical book or e-reader (No audiobooks)</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => updateLog({ readingComplete: !currentEntry.readingComplete })}
+                    className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
+                      currentEntry.readingComplete
+                        ? 'bg-emerald-500 border-emerald-400 text-white'
+                        : 'border-zinc-700 hover:border-zinc-600 bg-zinc-950'
+                    }`}
+                  >
+                    {currentEntry.readingComplete && '✓'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <input
+                    type="text"
+                    value={currentEntry.bookTitle}
+                    onChange={(e) => updateLog({ bookTitle: e.target.value })}
+                    placeholder="Book Title (e.g. Can't Hurt Me)"
+                    className="sm:col-span-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition"
+                  />
+                  <input
+                    type="text"
+                    value={currentEntry.pagesRead}
+                    onChange={(e) => updateLog({ pagesRead: e.target.value })}
+                    placeholder="Pages (e.g. 45-56)"
+                    className="bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* 5. Diet & Alcohol Verification (Strict Separate Toggles) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Strict Diet */}
+                <button
+                  type="button"
+                  onClick={() => updateLog({ dietFollowed: !currentEntry.dietFollowed })}
+                  className={`p-4 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                    currentEntry.dietFollowed
+                      ? 'bg-emerald-950/20 border-emerald-500/50'
+                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className={`p-2 rounded-xl ${currentEntry.dietFollowed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
+                      <Icons.Apple />
+                    </div>
+                    <span className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs ${currentEntry.dietFollowed ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-zinc-700'}`}>
+                      {currentEntry.dietFollowed ? '✓' : ''}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-sm text-zinc-100">Strict Diet Maintained</h3>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">Zero cheat meals, exact macros/plan followed.</p>
+                </button>
+
+                {/* Zero Alcohol */}
+                <button
+                  type="button"
+                  onClick={() => updateLog({ noAlcohol: !currentEntry.noAlcohol })}
+                  className={`p-4 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                    currentEntry.noAlcohol
+                      ? 'bg-emerald-950/20 border-emerald-500/50'
+                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className={`p-2 rounded-xl ${currentEntry.noAlcohol ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
+                      <Icons.Ban />
+                    </div>
+                    <span className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs ${currentEntry.noAlcohol ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-zinc-700'}`}>
+                      {currentEntry.noAlcohol ? '✓' : ''}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-sm text-zinc-100">Zero Alcohol</h3>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">No beer, wine, or liquor consumed.</p>
+                </button>
+              </div>
+
+              {/* 6. Daily Progress Photo */}
+              <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${currentEntry.photoTaken ? 'bg-zinc-900/90 border-emerald-500/40' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2.5 rounded-xl ${currentEntry.photoTaken ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
+                      <Icons.Camera />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-base text-zinc-100 leading-tight">Daily Progress Photo</h2>
+                      <p className="text-xs text-zinc-400">Direct camera snap (saved to camera roll)</p>
+                    </div>
+                  </div>
+                  {currentEntry.photoTaken && <Icons.Check />}
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <label className="flex-1 cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                    <div className="w-full py-3 px-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-950/60 hover:bg-zinc-900 hover:border-zinc-600 transition flex items-center justify-center space-x-2 text-zinc-300 font-semibold text-xs sm:text-sm">
+                      <Icons.Camera />
+                      <span>{currentEntry.photoTaken ? "Retake Camera Shot" : "Open Camera & Take Photo"}</span>
+                    </div>
+                  </label>
+
+                  {/* Thumbnail Preview */}
+                  {currentEntry.photoBase64 && (
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-emerald-500/50 shrink-0 bg-zinc-950">
+                      <img
+                        src={currentEntry.photoBase64}
+                        alt="Daily Progress"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </main>
+
+          {/* Toast / Sync Notification Pill */}
+          {syncMessage && (
+            <aside aria-label="Notifications" className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-semibold shadow-2xl backdrop-blur-md bg-zinc-900/90 border border-zinc-700 text-zinc-100 flex items-center space-x-2 animate-bounce">
+              <span className={`w-2 h-2 rounded-full ${syncMessage.type === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+              <span>{syncMessage.text}</span>
+            </aside>
+          )}
+
+          {/* SETTINGS MODAL */}
+          {showSettings && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Icons.Settings /> Settings & Cloud Sync
+                  </h3>
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="text-zinc-400 hover:text-zinc-200 text-lg font-bold p-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-4 text-xs sm:text-sm">
+                  <div>
+                    <label className="block font-semibold text-zinc-300 mb-1.5">
+                      Google Apps Script Web App URL:
+                    </label>
+                    <input
+                      type="text"
+                      value={webAppUrl}
+                      onChange={(e) => setWebAppUrl(e.target.value)}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-rose-500"
+                    />
+                    <p className="text-[11px] text-zinc-500 mt-1">
+                      Paste the published Web App URL from your Google Apps Script editor.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800/80">
+                    <div>
+                      <div className="font-semibold text-zinc-200">Auto-Sync on Check</div>
+                      <div className="text-[11px] text-zinc-500">Automatically syncs changes after a 3s pause</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAutoSync(!autoSync)}
+                      className={`w-11 h-6 rounded-full transition-colors relative ${autoSync ? 'bg-rose-600' : 'bg-zinc-800'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${autoSync ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 text-[11px] text-zinc-400 space-y-1">
+                    <p className="font-semibold text-zinc-300">Quick Google Sheets Setup:</p>
+                    <p>1. Open a Google Sheet & go to Extensions → Apps Script.</p>
+                    <p>2. Paste the provided Code.gs script.</p>
+                    <p>3. Deploy as Web App (Access: Anyone) & paste the URL above.</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowSettings(false);
+                      showToast("Settings saved locally");
+                    }}
+                    className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-500 font-bold text-xs uppercase tracking-wider text-white transition"
+                  >
+                    Save & Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* HISTORY / ARCHIVES MODAL */}
+          {showHistory && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Icons.History /> Attempt History
+                  </h3>
+                  <button
+                    onClick={() => setShowHistory(false)}
+                    className="text-zinc-400 hover:text-zinc-200 text-lg font-bold p-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {archivedAttempts.length === 0 ? (
+                    <div className="text-center py-8 text-zinc-500 text-xs">
+                      No previous attempts archived. This is your definitive run!
+                    </div>
+                  ) : (
+                    archivedAttempts.map((item, idx) => (
+                      <div key={idx} className="p-3 rounded-xl bg-zinc-950 border border-zinc-800/80 flex items-center justify-between text-xs">
+                        <div>
+                          <div className="font-bold text-zinc-200">Attempt #{archivedAttempts.length - idx}</div>
+                          <div className="text-[10px] text-zinc-500">Ended: {new Date(item.resetTimestamp).toLocaleDateString()}</div>
+                        </div>
+                        <div className="text-right">
+                          <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold">
+                            Reached Day {item.endedAtDay}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* RESET TO DAY 1 CONFIRMATION MODAL */}
+          {showResetConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-zinc-900 border border-rose-900/50 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl text-center">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 mx-auto flex items-center justify-center text-xl font-bold">
+                  ⚠️
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-tight text-white">Reset to Day 1?</h3>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    According to the 75 Hard rules, any failure requires restarting from Day 1. Your current streak (Day {currentDay}) will be archived.
+                  </p>
+                </div>
+
+                <div className="flex space-x-2 pt-2">
+                  <button
+                    onClick={() => setShowResetConfirm(false)}
+                    className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleResetChallenge}
+                    className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold uppercase tracking-wider text-white transition"
+                  >
+                    Confirm Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
