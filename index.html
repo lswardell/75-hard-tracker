@@ -30,10 +30,10 @@
     }
   </script>
 
-  <!-- React 18 & Babel via CDN -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- High-Availability Production CDN Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.4/babel.min.js" crossorigin="anonymous"></script>
 
   <style>
     body {
@@ -56,11 +56,76 @@
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen antialiased selection:bg-rose-500 selection:text-white">
 
-  <div id="root"></div>
+  <!-- Root mount with built-in instant loader -->
+  <div id="root">
+    <div class="min-h-screen flex flex-col items-center justify-center p-6 space-y-4 bg-zinc-950 text-zinc-400">
+      <div class="w-10 h-10 border-3 border-rose-600 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-xs uppercase tracking-widest font-bold text-zinc-500">Loading 75 Hard...</p>
+    </div>
+  </div>
+
+  <!-- Crash Recovery Dialog (Only visible if mobile script fails) -->
+  <div id="crash-fallback" style="display: none;" class="min-h-screen p-6 flex flex-col items-center justify-center text-center space-y-4 bg-zinc-950 text-zinc-200">
+    <div class="text-4xl">⚠️</div>
+    <h2 class="text-xl font-bold">App Error Encountered</h2>
+    <p id="crash-details" class="text-xs text-zinc-400 max-w-xs"></p>
+    <button onclick="localStorage.clear(); window.location.reload();" class="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg">
+      Reset App Data & Reload
+    </button>
+  </div>
+
+  <script>
+    // Global fallback handler for mobile browsers
+    window.addEventListener('error', function(e) {
+      console.error("Global script error:", e);
+      var root = document.getElementById('root');
+      var fallback = document.getElementById('crash-fallback');
+      var details = document.getElementById('crash-details');
+      if (root && root.children.length > 0 && root.children[0].id === 'app-loading') {
+        root.style.display = 'none';
+        if (fallback) {
+          fallback.style.display = 'flex';
+          if (details) details.textContent = e.message || "Failed to load components. Tap below to reset cache.";
+        }
+      }
+    });
+  </script>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, Component } = React;
 
+    // --- CRASH RESILIENT STORAGE HELPER ---
+    const safeStore = {
+      get: (key, fallback = null) => {
+        try {
+          const item = localStorage.getItem(key);
+          return item !== null ? item : fallback;
+        } catch (err) {
+          console.warn("Storage read error:", key, err);
+          return fallback;
+        }
+      },
+      getJSON: (key, fallback) => {
+        try {
+          const item = localStorage.getItem(key);
+          if (!item) return fallback;
+          return JSON.parse(item);
+        } catch (err) {
+          console.warn("Storage parse error:", key, err);
+          return fallback;
+        }
+      },
+      set: (key, value) => {
+        try {
+          const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+          localStorage.setItem(key, serialized);
+        } catch (err) {
+          console.warn("Storage write error:", key, err);
+        }
+      }
+    };
+
+    // --- UI ICONS ---
     const Icons = {
       Droplet: () => (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,12 +205,13 @@
     function calculateDayNumber(startDateIso) {
       if (!startDateIso) return 1;
       const start = new Date(startDateIso);
+      if (isNaN(start.getTime())) return 1;
       start.setHours(0, 0, 0, 0);
       const now = new Date();
       now.setHours(0, 0, 0, 0);
       const diffMs = now.getTime() - start.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      return Math.max(1, diffDays + 1);
+      return Math.max(1, (isNaN(diffDays) ? 0 : diffDays) + 1);
     }
 
     const defaultDayState = {
@@ -167,25 +233,22 @@
 
     function App() {
       const [hasStarted, setHasStarted] = useState(() => {
-        return localStorage.getItem('75hard_started') === 'true';
+        return safeStore.get('75hard_started') === 'true';
       });
       const [startDate, setStartDate] = useState(() => {
-        return localStorage.getItem('75hard_startDate') || null;
+        return safeStore.get('75hard_startDate', null);
       });
       const [webAppUrl, setWebAppUrl] = useState(() => {
-        return localStorage.getItem('75hard_webAppUrl') || '';
+        return safeStore.get('75hard_webAppUrl', '');
       });
       const [autoSync, setAutoSync] = useState(() => {
-        return localStorage.getItem('75hard_autoSync') === 'true';
+        return safeStore.get('75hard_autoSync') === 'true';
       });
       const [archivedAttempts, setArchivedAttempts] = useState(() => {
-        const saved = localStorage.getItem('75hard_archives');
-        return saved ? JSON.parse(saved) : [];
+        return safeStore.getJSON('75hard_archives', []);
       });
-
       const [dailyLogs, setDailyLogs] = useState(() => {
-        const saved = localStorage.getItem('75hard_dailyLogs');
-        return saved ? JSON.parse(saved) : {};
+        return safeStore.getJSON('75hard_dailyLogs', {});
       });
 
       const [showSettings, setShowSettings] = useState(false);
@@ -203,22 +266,22 @@
       }, [dailyLogs, todayKey]);
 
       useEffect(() => {
-        localStorage.setItem('75hard_started', hasStarted);
-        if (startDate) localStorage.setItem('75hard_startDate', startDate);
-        localStorage.setItem('75hard_webAppUrl', webAppUrl);
-        localStorage.setItem('75hard_autoSync', autoSync);
-        localStorage.setItem('75hard_archives', JSON.stringify(archivedAttempts));
-        localStorage.setItem('75hard_dailyLogs', JSON.stringify(dailyLogs));
+        safeStore.set('75hard_started', String(hasStarted));
+        if (startDate) safeStore.set('75hard_startDate', startDate);
+        safeStore.set('75hard_webAppUrl', webAppUrl);
+        safeStore.set('75hard_autoSync', String(autoSync));
+        safeStore.set('75hard_archives', archivedAttempts);
+        safeStore.set('75hard_dailyLogs', dailyLogs);
       }, [hasStarted, startDate, webAppUrl, autoSync, archivedAttempts, dailyLogs]);
 
       const taskWeights = useMemo(() => {
-        const waterDone = currentEntry.water1 && currentEntry.water2;
-        const w1Done = currentEntry.workout1Complete;
-        const w2Done = currentEntry.workout2Complete;
-        const readDone = currentEntry.readingComplete;
-        const dietDone = currentEntry.dietFollowed;
-        const alcDone = currentEntry.noAlcohol;
-        const photoDone = currentEntry.photoTaken;
+        const waterDone = Boolean(currentEntry && currentEntry.water1 && currentEntry.water2);
+        const w1Done = Boolean(currentEntry && currentEntry.workout1Complete);
+        const w2Done = Boolean(currentEntry && currentEntry.workout2Complete);
+        const readDone = Boolean(currentEntry && currentEntry.readingComplete);
+        const dietDone = Boolean(currentEntry && currentEntry.dietFollowed);
+        const alcDone = Boolean(currentEntry && currentEntry.noAlcohol);
+        const photoDone = Boolean(currentEntry && currentEntry.photoTaken);
 
         const totalTasks = 7;
         const completedCount = [waterDone, w1Done, w2Done, readDone, dietDone, alcDone, photoDone].filter(Boolean).length;
@@ -661,4 +724,347 @@
                     value={currentEntry.bookTitle}
                     onChange={(e) => updateLog({ bookTitle: e.target.value })}
                     placeholder="Book Title (e.g. Can't Hurt Me)"
-                    className="sm:col-span-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-2
+                    className="sm:col-span-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition"
+                  />
+                  <input
+                    type="text"
+                    value={currentEntry.pagesRead}
+                    onChange={(e) => updateLog({ pagesRead: e.target.value })}
+                    placeholder="Pages (e.g. 45-56)"
+                    className="bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* 5. Diet & Alcohol Verification */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Strict Diet */}
+                <button
+                  type="button"
+                  onClick={() => updateLog({ dietFollowed: !currentEntry.dietFollowed })}
+                  className={`p-4 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                    currentEntry.dietFollowed
+                      ? 'bg-emerald-950/20 border-emerald-500/50'
+                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className={`p-2 rounded-xl ${currentEntry.dietFollowed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
+                      <Icons.Apple />
+                    </div>
+                    <span className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs font-bold transition-colors ${
+                      currentEntry.dietFollowed ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-zinc-700 bg-zinc-950'
+                    }`}>
+                      {currentEntry.dietFollowed ? '✓' : ''}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-sm text-zinc-100">Strict Diet Maintained</h3>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">Zero cheat meals, exact macros/plan followed.</p>
+                </button>
+
+                {/* Zero Alcohol */}
+                <button
+                  type="button"
+                  onClick={() => updateLog({ noAlcohol: !currentEntry.noAlcohol })}
+                  className={`p-4 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                    currentEntry.noAlcohol
+                      ? 'bg-emerald-950/20 border-emerald-500/50'
+                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className={`p-2 rounded-xl ${currentEntry.noAlcohol ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
+                      <Icons.Ban />
+                    </div>
+                    <span className={`w-5 h-5 rounded-md flex items-center justify-center border text-xs font-bold transition-colors ${
+                      currentEntry.noAlcohol ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-zinc-700 bg-zinc-950'
+                    }`}>
+                      {currentEntry.noAlcohol ? '✓' : ''}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-sm text-zinc-100">Zero Alcohol</h3>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">No beer, wine, or liquor consumed.</p>
+                </button>
+              </div>
+
+              {/* 6. Daily Progress Photo (Checkbox) */}
+              <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${currentEntry.photoTaken ? 'bg-zinc-900/90 border-emerald-500/40' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2.5 rounded-xl ${currentEntry.photoTaken ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
+                      <Icons.Camera />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-base text-zinc-100 leading-tight">Daily Progress Photo</h2>
+                      <p className="text-xs text-zinc-400">Take a photo using your phone's camera</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => updateLog({ photoTaken: !currentEntry.photoTaken })}
+                    className={`w-7 h-7 rounded-lg border flex items-center justify-center font-bold text-xs transition-all ${
+                      currentEntry.photoTaken
+                        ? 'bg-emerald-500 border-emerald-400 text-white'
+                        : 'border-zinc-700 hover:border-zinc-600 bg-zinc-950'
+                    }`}
+                  >
+                    {currentEntry.photoTaken && '✓'}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </main>
+
+          {/* Sync / Toast Notifications */}
+          {syncMessage && (
+            <aside aria-label="Notifications" className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-semibold shadow-2xl backdrop-blur-md bg-zinc-900/90 border border-zinc-700 text-zinc-100 flex items-center space-x-2 animate-bounce">
+              <span className={`w-2 h-2 rounded-full ${syncMessage.type === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+              <span>{syncMessage.text}</span>
+            </aside>
+          )}
+
+          {/* Settings Modal */}
+          {showSettings && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Icons.Settings /> Settings & Cloud Sync
+                  </h3>
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="text-zinc-400 hover:text-zinc-200 text-lg font-bold p-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-4 text-xs sm:text-sm">
+                  <div>
+                    <label className="block font-semibold text-zinc-300 mb-1.5">
+                      Google Apps Script Web App URL:
+                    </label>
+                    <input
+                      type="text"
+                      value={webAppUrl}
+                      onChange={(e) => setWebAppUrl(e.target.value)}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-rose-500"
+                    />
+                    <p className="text-[11px] text-zinc-500 mt-1">
+                      Paste the published Web App URL from your Google Apps Script editor.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800/80">
+                    <div>
+                      <div className="font-semibold text-zinc-200">Auto-Sync on Check</div>
+                      <div className="text-[11px] text-zinc-500">Automatically syncs changes after a 3s pause</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAutoSync(!autoSync)}
+                      className={`w-11 h-6 rounded-full transition-colors relative ${autoSync ? 'bg-rose-600' : 'bg-zinc-800'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${autoSync ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 text-[11px] text-zinc-400 space-y-1">
+                    <p className="font-semibold text-zinc-300">Quick Google Sheets Setup:</p>
+                    <p>1. Open a Google Sheet & go to Extensions → Apps Script.</p>
+                    <p>2. Paste the provided Code.gs script.</p>
+                    <p>3. Deploy as Web App (Access: Anyone) & paste the URL above.</p>
+                  </div>
+
+                  {/* Danger Zone */}
+                  <div className="p-3.5 bg-rose-950/20 rounded-xl border border-rose-900/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-bold text-rose-400 text-xs">Danger Zone</div>
+                        <div className="text-[11px] text-zinc-500">Restart challenge back to Day 1</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSettings(false);
+                          setResetConfirmText('');
+                          setShowResetConfirm(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 text-rose-400 border border-rose-800/60 font-semibold text-xs transition active:scale-95"
+                      >
+                        Reset Streak
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowSettings(false);
+                      showToast("Settings saved locally");
+                    }}
+                    className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-500 font-bold text-xs uppercase tracking-wider text-white transition"
+                  >
+                    Save & Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* History Modal */}
+          {showHistory && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Icons.History /> Attempt History
+                  </h3>
+                  <button
+                    onClick={() => setShowHistory(false)}
+                    className="text-zinc-400 hover:text-zinc-200 text-lg font-bold p-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {archivedAttempts.length === 0 ? (
+                    <div className="text-center py-8 text-zinc-500 text-xs">
+                      No previous attempts archived. This is your definitive run!
+                    </div>
+                  ) : (
+                    archivedAttempts.map((item, idx) => (
+                      <div key={idx} className="p-3 rounded-xl bg-zinc-950 border border-zinc-800/80 flex items-center justify-between text-xs">
+                        <div>
+                          <div className="font-bold text-zinc-200">Attempt #{archivedAttempts.length - idx}</div>
+                          <div className="text-[10px] text-zinc-500">Ended: {new Date(item.resetTimestamp).toLocaleDateString()}</div>
+                        </div>
+                        <div className="text-right">
+                          <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 font-bold">
+                            Reached Day {item.endedAtDay}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Reset Confirmation Modal */}
+          {showResetConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-zinc-900 border border-rose-900/50 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl text-center">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 mx-auto flex items-center justify-center text-xl font-bold">
+                  ⚠️
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-tight text-white">Reset to Day 1?</h3>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    According to the 75 Hard rules, any failure requires restarting from Day 1. Your current streak (Day {currentDay}) will be archived.
+                  </p>
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-[11px] font-semibold text-zinc-400">
+                    Type <span className="font-mono font-bold text-rose-400">RESET</span> to confirm:
+                  </label>
+                  <input
+                    type="text"
+                    value={resetConfirmText}
+                    onChange={(e) => setResetConfirmText(e.target.value)}
+                    placeholder="RESET"
+                    autoCapitalize="characters"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-center text-sm font-bold tracking-widest text-white uppercase placeholder-zinc-600 focus:outline-none focus:border-rose-500 transition"
+                  />
+                </div>
+
+                <div className="flex space-x-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setResetConfirmText('');
+                      setShowResetConfirm(false);
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={resetConfirmText.trim().toUpperCase() !== 'RESET'}
+                    onClick={handleResetChallenge}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition ${
+                      resetConfirmText.trim().toUpperCase() === 'RESET'
+                        ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer shadow-lg shadow-rose-950/50 active:scale-95'
+                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50'
+                    }`}
+                  >
+                    Confirm Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // Error Boundary wrapper to guarantee mobile UI recovery
+    class ErrorBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, errorInfo) {
+        console.error("App Render Error:", error, errorInfo);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center space-y-4 bg-zinc-950 text-white font-sans">
+              <div className="text-3xl">⚠️</div>
+              <h1 className="text-lg font-bold">Something went wrong</h1>
+              <p className="text-xs text-zinc-400 max-w-xs">
+                Your browser encountered an unexpected state. You can reset local storage to resolve it.
+              </p>
+              <button
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                className="px-4 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-lg"
+              >
+                Reset App & Reload
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
+  </script>
+</body>
+</html>
